@@ -1,2 +1,12 @@
+# node_modules/
+# .env
+# Ignore dependency folders
 node_modules/
+
+# Ignore environment variables (Important!)
 .env
+backend/.env
+
+# Ignore OS metadata
+.DS_Store
+Thumbs.db
