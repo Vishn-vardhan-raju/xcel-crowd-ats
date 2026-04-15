@@ -4,7 +4,7 @@
 ---
 
 ## 📌 Project Overview
-**XcelCrowd** is a lightweight, automated recruitment pipeline designed specifically for small engineering teams. Traditional ATS platforms are often too expensive and manually intensive. This system replaces messy spreadsheets with an **Autonomous Queue**, ensuring that the hiring pipeline remains full and active without human intervention.
+**XcelCrowd** is a lightweight, automated recruitment pipeline designed specifically for small engineering teams. This system replaces messy spreadsheets with an **Autonomous Queue**, ensuring the hiring pipeline remains full and active without human intervention.
 
 ## 🛠 Tech Stack (PERN)
 * **Frontend:** `React.js` (Vite)
@@ -15,48 +15,44 @@
 
 ---
 
-## 🚀 Core Features & Logic
+## 📅 Development Progress
+
+### ✅ Day 1-2: Foundation
+- Initialized PostgreSQL `recruitment_db`.
+- Designed schema with tables for `applicants`, `jobs`, and `audit_logs`.
+- Set up Node/Express backend with database pooling (`pg`).
+
+### ✅ Day 3: API & Connectivity
+- **Live Database Connection:** Established a stable bridge between Express and Postgres.
+- **RESTful Endpoints:** - `POST /api/apply`: Validates and saves applicant data directly to the database.
+    - `GET /api/applicants`: Fetches and displays all applications in real-time.
+- **Data Integrity:** Implemented server-side validation to prevent empty or malformed entries.
+
+---
+
+## 🚀 Core Features & Logic (Coming Soon)
 
 ### 1️⃣ Capacity-Based Pipeline
-Companies define an **Active Capacity** (e.g., only 5 people interviewed at once).
-* **Active State:** Applicants currently being reviewed.
-* **Waitlist State:** Applications beyond capacity enter a queue (not a rejection).
-* **Auto-Promotion:** When an active applicant is hired or rejected, the system automatically promotes the next person in the waitlist.
+- **Active State:** Applicants currently being reviewed.
+- **Waitlist State:** Beyond capacity enter a queue.
+- **Auto-Promotion:** Hires/Rejections trigger the next person in line.
 
-### 2️⃣ Inactivity Decay (The "Self-Moving" Pipeline)
-To prevent the pipeline from stalling:
-* When promoted to **Active**, an applicant has a **24-hour window** to acknowledge.
-* **Penalty:** If they fail to respond, they move back **5 positions** in the waitlist.
-* The system then automatically promotes the next candidate in line.
-
-### 3️⃣ Traceability & Logs
-Every state transition (Applied → Waitlisted → Active → Decay) is logged with a timestamp in a dedicated `audit_logs` table for full reconstructability.
+### 2️⃣ Inactivity Decay
+- Applicants have a **24-hour window** to acknowledge promotion.
+- **Penalty:** Failure to respond moves them back **5 positions** in the waitlist.
 
 ---
 
 ## 🏗 Architectural Decisions
-
-### ⚔️ Handling Concurrency (Requirement #5)
-**The Challenge:** Two applications arriving at the exact same millisecond for the last "Active" spot.
-**The Strategy:** I implemented **PostgreSQL Database Transactions**. By using `SELECT ... FOR UPDATE`, the backend locks the job's capacity count during the write process. This ensures only one applicant claims the spot, while the other is assigned the first waitlist position, preventing "Over-Capacity" bugs.
-
-### 🖥 Minimalist Frontend
-* **Admin Dashboard:** Current pipeline state and capacity controls.
-* **Applicant Tracking:** Real-time queue position and status tracking.
+- **PostgreSQL Transactions:** Using `SELECT ... FOR UPDATE` to handle high-concurrency application spikes.
+- **Audit Logs:** Full traceability for every state transition to ensure the "Self-Moving" logic is reconstructible.
 
 ---
 
 ## 🚦 Setup Instructions
-1.  **Clone the repo:** ```bash
-    git clone [https://github.com/Vishn-vardhan-raju/xcel-crowd-ats](https://github.com/Vishn-vardhan-raju/xcel-crowd-ats)
-    ```
-2.  **Backend:** `cd backend && npm install`
-3.  **Frontend:** `cd frontend && npm install`
-4.  **Environment:** Setup `.env` with `DATABASE_URL` and `GEMINI_API_KEY`.
-5.  **Run:** `npm run dev`
-
----
-
-## 🔮 Future Improvements
-* Implement **WebSockets** for real-time "Queue Position" notifications.
-* Integrate **Agentic AI** to pre-screen candidates based on GitHub activity.
+1. **Clone the repo:** `git clone https://github.com/Vishn-vardhan-raju/xcel-crowd-ats`
+2. **Backend:** `cd backend && npm install`
+3. **Frontend:** `cd frontend && npm install`
+4. **Environment:** Setup `.env` in the backend folder with:
+   - `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_HOST`, `DB_PORT`
+5. **Run:** `npm run dev`
