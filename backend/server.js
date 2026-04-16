@@ -1,12 +1,16 @@
 const express = require('express');
+const cors = require('cors');
 const db = require('./db'); 
+require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 1. Middleware: Allows the server to understand JSON data
-app.use(express.json());
+// Middleware
+app.use(cors()); 
+app.use(express.json()); 
 
-// 2. Welcome Route: Visit http://localhost:5000 to see this
+// Welcome Route
 app.get('/', (req, res) => {
     res.send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 50px;">
@@ -17,50 +21,42 @@ app.get('/', (req, res) => {
     `);
 });
 
-// 3. GET ROUTE: Fetch all applicants from the database
-// This is where you will see your test data in the browser
+// GET: Fetch all applicants
 app.get('/api/applicants', async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM applicants ORDER BY created_at DESC');
+        const result = await db.query('SELECT * FROM applicants ORDER BY id DESC');
         res.json(result.rows);
     } catch (err) {
         console.error("Fetch Error:", err.message);
-        res.status(500).json({ error: "Could not fetch applicants from database." });
+        res.status(500).json({ error: "Could not fetch applicants." });
     }
 });
 
-// 4. POST ROUTE: Save a new applicant
+// POST: Save a new applicant
 app.post('/api/apply', async (req, res) => {
     const { name, email, resume_url } = req.body;
 
-    // 🛡️ Basic Validation
     if (!name || !email) {
-        return res.status(400).json({ error: "Name and Email are required fields." });
+        return res.status(400).json({ error: "Name and Email are required." });
     }
 
     try {
-        const query = `
+        const insertQuery = `
             INSERT INTO applicants (name, email, resume_url, status)
             VALUES ($1, $2, $3, 'applied')
             RETURNING *;
         `;
         const values = [name, email, resume_url];
+        const result = await db.query(insertQuery, values);
         
-// Change this line in server.js
-const result = await db.query('SELECT * FROM applicants ORDER BY id DESC');        
         console.log("✅ Data saved to Postgres:", result.rows[0]);
-        
-        res.status(201).json({
-            message: "Application submitted successfully!",
-            applicant: result.rows[0]
-        });
+        res.status(201).json({ message: "Application submitted successfully!" });
     } catch (err) {
         console.error("Database Insert Error:", err.message);
-        res.status(500).json({ error: "Failed to save data to the database." });
+        res.status(500).json({ error: "Failed to save data." });
     }
 });
 
-// 5. Start the Server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
