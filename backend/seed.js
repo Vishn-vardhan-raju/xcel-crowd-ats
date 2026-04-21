@@ -1,36 +1,18 @@
-require('dotenv').config();
 const { Pool } = require('pg');
+require('dotenv').config();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const seedDatabase = async () => {
+async function seed() {
   try {
-    console.log("🌱 Seeding database...");
-    
-    // Clear existing data (Be careful! This is for development)
-    await pool.query('TRUNCATE jobs, applicants RESTART IDENTITY CASCADE');
-
-    // Insert initial jobs with different capacities
-    const query = `
-      INSERT INTO jobs (title, active_capacity) 
-      VALUES 
-      ('Frontend Engineer', 3),
-      ('Backend Developer', 2),
-      ('UI/UX Designer', 1)
-      RETURNING *;
-    `;
-    
-    const res = await pool.query(query);
-    console.log("✅ Successfully inserted jobs:");
-    console.table(res.rows);
-
-    process.exit(0);
+    await pool.query('DELETE FROM applicants');
+    await pool.query('DELETE FROM jobs');
+    await pool.query('INSERT INTO jobs (title, active_capacity) VALUES ($1, $2)', ['Software Engineer', 2]);
+    console.log("✅ Database seeded with a job (Capacity: 2)");
+    process.exit();
   } catch (err) {
-    console.error("❌ Error seeding database:", err);
+    console.error(err);
     process.exit(1);
   }
-};
-
-seedDatabase();
+}
+seed();
