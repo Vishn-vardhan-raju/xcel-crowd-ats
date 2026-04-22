@@ -1,6 +1,6 @@
 const express = require('express');
-const cors = require('cors');
 const { Pool } = require('pg');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
@@ -9,90 +9,97 @@ app.use(express.json());
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// 1. HEALTH & STATS
-app.get('/api/health', (req, res) => res.json({ status: "Online" }));
-
-app.get('/api/jobs/:jobId/summary', async (req, res) => {
-  try {
-    const stats = await pool.query(
-      `SELECT 
-        (SELECT active_capacity FROM jobs WHERE id = $1) as capacity,
-        (SELECT COUNT(*) FROM applicants WHERE job_id = $1 AND status = 'ACTIVE') as active,
-        (SELECT COUNT(*) FROM applicants WHERE job_id = $1 AND status = 'WAITLISTED') as queued`,
-      [req.params.jobId]
+const logTransition = async (client, applicantId, jobId, type, details) => {
+    await client.query(
+        'INSERT INTO pipeline_logs (applicant_id, job_id, action_type, details) VALUES ($1, $2, $3, $4)',
+        [applicantId, jobId, type, details]
     );
-    res.json(stats.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+};
 
-// 2. APPLY ROUTE (With Validation & Queue Logic)
+// --- Requirement: Candidate Application ---
 app.post('/api/apply', async (req, res) => {
-  const { jobId, name, email } = req.body;
-  if (!name || !email || !jobId) return res.status(400).json({ error: "Missing fields" });
+    const { jobId, name, email } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const jobRes = await client.query('SELECT * FROM jobs WHERE id = $1 FOR UPDATE', [jobId]);
+        const job = jobRes.rows[0];
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const job = await client.query('SELECT active_capacity FROM jobs WHERE id = $1 FOR UPDATE', [jobId]);
-    const activeCount = await client.query("SELECT COUNT(*) FROM applicants WHERE job_id = $1 AND status = 'ACTIVE'", [jobId]);
-    
-    let status = 'WAITLISTED', qPos = null;
-    if (parseInt(activeCount.rows[0].count) < job.rows[0].active_capacity) {
-      status = 'ACTIVE';
-    } else {
-      const lastPos = await client.query("SELECT COALESCE(MAX(queue_position), 0) + 1 as pos FROM applicants WHERE job_id = $1", [jobId]);
-      qPos = lastPos.rows[0].pos;
-    }
+        const activeCountRes = await client.query('SELECT COUNT(*) FROM applicants WHERE job_id = $1 AND status = $2', [jobId, 'ACTIVE']);
+        const activeCount = parseInt(activeCountRes.rows[0].count);
 
-    const result = await client.query(
-      'INSERT INTO applicants (job_id, name, email, status, queue_position) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [jobId, name, email, status, qPos]
-    );
-    await client.query('COMMIT');
-    res.status(201).json(result.rows[0]);
-  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
-  finally { client.release(); }
+        let status = (activeCount < job.active_capacity) ? 'ACTIVE' : 'WAITLISTED';
+        let queue_pos = (status === 'WAITLISTED') ? 
+            (await client.query('SELECT COALESCE(MAX(queue_position), 0) + 1 as next FROM applicants WHERE job_id = $1', [jobId])).rows[0].next : null;
+
+        const newApp = await client.query(
+            `INSERT INTO applicants (job_id, name, email, status, queue_position, promoted_at) 
+             VALUES ($1, $2, $3, $4, $5, ${status === 'ACTIVE' ? 'NOW()' : 'NULL'}) RETURNING *`,
+            [jobId, name, email, status, queue_pos]
+        );
+
+        await logTransition(client, newApp.rows[0].id, jobId, 'APPLIED', `Joined as ${status}`);
+        await client.query('COMMIT');
+        res.status(201).json(newApp.rows[0]);
+    } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }
+    finally { client.release(); }
 });
 
-// 3. PROMOTION ROUTE (The Chain Reaction)
-app.patch('/api/applicants/:id/status', async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const current = await client.query('SELECT job_id, status FROM applicants WHERE id = $1', [id]);
-    const applicant = current.rows[0];
-
-    await client.query('UPDATE applicants SET status = $1, queue_position = NULL WHERE id = $2', [status, id]);
-
-    if (applicant.status === 'ACTIVE') {
-      const next = await client.query(
-        'SELECT id FROM applicants WHERE job_id = $1 AND status = ' + "'WAITLISTED' ORDER BY queue_position ASC LIMIT 1",
-        [applicant.job_id]
-      );
-      if (next.rows.length > 0) {
-        await client.query("UPDATE applicants SET status = 'ACTIVE', queue_position = NULL WHERE id = $1", [next.rows[0].id]);
-        await client.query("UPDATE applicants SET queue_position = queue_position - 1 WHERE job_id = $1 AND status = 'WAITLISTED'", [applicant.job_id]);
-      }
-    }
-    await client.query('COMMIT');
-    res.json({ message: "Success: Queue updated" });
-  } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: err.message }); }
-  finally { client.release(); }
+// --- Requirement: Candidate Status Check ---
+app.get('/api/status/:email', async (req, res) => {
+    const result = await pool.query('SELECT * FROM applicants WHERE email = $1 ORDER BY created_at DESC LIMIT 1', [req.params.email]);
+    res.json(result.rows[0] || { error: "Not found" });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Working Model Live on port ${PORT}`));
-app.get('/api/jobs/:jobId/applicants', async (req, res) => {
-  const { jobId } = req.params;
-  try {
-    const result = await pool.query(
-      'SELECT id, name, email, status, queue_position FROM applicants WHERE job_id = $1 ORDER BY status ASC, queue_position ASC',
-      [jobId]
-    );
+// --- Requirement: Recruiter Controls ---
+app.get('/api/recruiter/applicants/:jobId', async (req, res) => {
+    const result = await pool.query('SELECT * FROM applicants WHERE job_id = $1 ORDER BY status, queue_position', [req.params.jobId]);
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
+
+app.patch('/api/applicants/:id/status', async (req, res) => {
+    const { status } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const user = (await client.query('SELECT * FROM applicants WHERE id = $1', [req.params.id])).rows[0];
+        await client.query('UPDATE applicants SET status = $1, queue_position = NULL WHERE id = $2', [status, req.params.id]);
+        
+        if (status === 'REJECTED') {
+            const next = (await client.query('SELECT * FROM applicants WHERE job_id = $1 AND status = $2 ORDER BY queue_position ASC LIMIT 1', [user.job_id, 'WAITLISTED'])).rows[0];
+            if (next) {
+                await client.query('UPDATE applicants SET status = $1, queue_position = NULL, promoted_at = NOW(), acknowledged = FALSE WHERE id = $2', ['ACTIVE', next.id]);
+                await client.query('UPDATE applicants SET queue_position = queue_position - 1 WHERE job_id = $1 AND status = $2', [user.job_id, 'WAITLISTED']);
+            }
+        }
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }
+    finally { client.release(); }
+});
+
+// --- Requirement: Inactivity Swap Logic (The Core) ---
+const handleDecay = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const expired = await client.query(`SELECT * FROM applicants WHERE status = 'ACTIVE' AND acknowledged = FALSE AND promoted_at < NOW() - INTERVAL '1 minute'`); // Set to 1 min for testing
+
+        for (let user of expired.rows) {
+            const nextInQueue = (await client.query(`SELECT * FROM applicants WHERE job_id = $1 AND status = 'WAITLISTED' ORDER BY queue_position ASC LIMIT 1`, [user.job_id])).rows[0];
+            
+            if (nextInQueue) {
+                // SWAP Logic
+                await client.query(`UPDATE applicants SET status = 'WAITLISTED', queue_position = 1, promoted_at = NULL WHERE id = $1`, [user.id]);
+                await client.query(`UPDATE applicants SET status = 'ACTIVE', queue_position = NULL, promoted_at = NOW(), acknowledged = FALSE WHERE id = $1`, [nextInQueue.id]);
+                await client.query(`UPDATE applicants SET queue_position = queue_position + 1 WHERE job_id = $1 AND status = 'WAITLISTED' AND id != $2`, [user.job_id, user.id]);
+                await logTransition(client, user.id, user.job_id, 'SWAPPED', `Swapped with ${nextInQueue.name} due to inactivity`);
+            }
+        }
+        await client.query('COMMIT');
+    } catch (e) { await client.query('ROLLBACK'); }
+    finally { client.release(); }
+};
+setInterval(handleDecay, 30000);
+
+app.listen(5000, () => console.log("XcelCrowd Engine v2 running on 5000"));

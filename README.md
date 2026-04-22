@@ -89,3 +89,23 @@ Integrating Google Gemini to provide a "Compatibility Score," helping recruiters
 **T Vishnu Vardhan Raju**
 _Information Technology Student | Telangana, India_
 [GitHub](https://github.com/Vishn-vardhan-raju) | [HackerRank](https://www.hackerrank.com/tangellavishnu)
+
+# XcelCrowd Autonomous Pipeline
+
+## Requirement #5: Concurrency Approach
+
+To handle simultaneous applications for the last spot:
+
+1. We use **PostgreSQL Transactions (`BEGIN` / `COMMIT`)**.
+2. We invoke `SELECT ... FOR UPDATE` on the Job record. This locks the row so that any other concurrent request must wait until the first one finishes calculating capacity and inserts the applicant.
+
+## Requirement #7: Inactivity Decay Logic
+
+- **Decay Window**: 24 Hours.
+- **Trigger**: A `setInterval` worker runs every minute to scan for `ACTIVE` users who haven't `acknowledged`.
+- **Penalty**: If they fail to acknowledge, their status reverts to `WAITLISTED`, they are moved to the end of the current queue (`MAX(pos) + 1`), and their `penalty_count` increments.
+- **Cascade**: Upon decay, the next person in the waitlist is automatically promoted to `ACTIVE`.
+
+## Requirement #6: Traceability
+
+All movements are recorded in the `pipeline_logs` table, capturing the timestamp, the user, and the specific transition reason.
