@@ -7,7 +7,7 @@
 <br />
 
 <div align="center">
-  <img src="https://github.com/Vishn-vardhan-raju/xcel-crowd-ats/blob/main/candidate_portal_ss.png?raw=true" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Candidate Portal Interface" />
+  <img src="https://raw.githubusercontent.com/Vishn-vardhan-raju/xcel-crowd-ats/main/candidate_portal_ss.png" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Candidate Portal Interface" />
   <p><i>Candidate Interface: Real-time status tracking and acknowledgment portal.</i></p>
 </div>
 
@@ -53,7 +53,7 @@
 <br />
 
 <div align="center">
-  <img src="https://github.com/Vishn-vardhan-raju/xcel-crowd-ats/blob/main/recruiter_dashboard_ss.png?raw=true" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Recruiter Dashboard Interface" />
+  <img src="https://raw.githubusercontent.com/Vishn-vardhan-raju/xcel-crowd-ats/main/recruiter_dashboard_ss.png" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Recruiter Dashboard Interface" />
   <p><i>Recruiter Dashboard: Managing the Live Queue and auditing Rejected History.</i></p>
 </div>
 
