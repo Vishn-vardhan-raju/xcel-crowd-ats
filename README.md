@@ -6,11 +6,19 @@
 
 <hr />
 
-## 📋 Core Project Requirements & Implementation
+## 🎯 What your project does
+
+<p>
+  XcelCrowd is an advanced, automated recruitment pipeline designed to eliminate manual overhead in candidate queue management. The system operates on a "Self-Healing" philosophy: when an active spot opens up, the next best candidate is promoted instantly, maintaining a fluid, transparent, and fair hiring experience without human intervention. It ensures that the recruitment process remains active 24/7 by handling candidate promotions and inactivity penalties automatically.
+</p>
+
+<hr />
+
+## 📋 Key Features and Highlights
 
 <table width="100%">
   <tr style="background-color: #f8f9fa;">
-    <th width="30%">Requirement</th>
+    <th width="30%">Feature</th>
     <th>Technical Implementation Detail</th>
   </tr>
   <tr>
@@ -76,7 +84,7 @@
 
 <hr />
 
-## 🗄️ Database Architecture
+## 🗄️ Database Architecture (Project Highlights)
 
 <table width="100%">
   <thead>
@@ -120,7 +128,7 @@
 
 <hr />
 
-## 🛠️ Execution & Installation Commands
+## ⚙️ How to set it up and run
 
 <table width="100%" style="background-color: #2d3436; color: #dfe6e9; border-radius: 8px;">
   <tr>
@@ -151,9 +159,7 @@ npm run dev
   </tr>
 </table>
 
-<hr />
-
-## 🚀 Installation Details
+<br />
 
 <ol>
   <li><b>Prerequisites:</b> Ensure Node.js and PostgreSQL are installed.</li>
@@ -161,6 +167,16 @@ npm run dev
   <li><b>Vite Server:</b> The frontend runs on <code>localhost:5173</code> by default.</li>
   <li><b>Automatic Cascade:</b> The 24-hour decay check triggers automatically on every status check or dashboard refresh.</li>
 </ol>
+
+<hr />
+
+## ✨ Additional Technical Insights (Challenge Requirements)
+
+<ul>
+  <li><b>Reliability:</b> The PERN stack was chosen for its ability to handle complex relational logic and provide real-time updates to the UI.</li>
+  <li><b>Security:</b> User interactions are validated against their unique email addresses, preventing unauthorized status manipulation.</li>
+  <li><b>Auditability:</b> The <code>rejected_applicants</code> table ensures that recruiters can audit past decisions without cluttering the live queue.</li>
+</ul>
 
 <br />
 
