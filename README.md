@@ -1,47 +1,140 @@
-🚀 XcelCrowd: Autonomous Next-In-Line ATS
-A Self-Governing Recruitment Engine Built for Atomic Fairness.
+# 🚀 XcelCrowd: Autonomous Next-In-Line ATS
 
-XcelCrowd is an advanced, automated recruitment pipeline designed to eliminate the manual overhead of queue management. Built with a "Self-Healing" philosophy, the system ensures that when a spot opens up, the next best candidate is promoted instantly, maintaining a fluid, transparent, and fair hiring experience without human intervention.
+<p align="center">
+  <b>A Self-Governing Recruitment Engine Built for Atomic Fairness.</b>
+</p>
 
-🏗️ System Architecture & Logic
+<br />
 
-1. The "Active Pool" & Capacity Management
-   The system is governed by a strict Active Capacity of 3 applicants.
+<div align="center">
+  <img src="https://github.com/Vishn-vardhan-raju/xcel-crowd-ats/blob/main/your-main-image.png?raw=true" width="900px" alt="Main Dashboard Header" />
+</div>
 
-Automatic Status Assignment: The first three users to apply are granted ACTIVE status immediately.
+---
 
-Waitlist Overflow: Any applications received after the capacity is reached are placed in a Sequential Waitlist with a specific queue_position.
+## 🏗️ System Architecture & Logic
 
-No Premature Rejection: Candidates are never rejected due to high volume; they are simply queued, ensuring every applicant has a fair chance once a spot vacates. 2. Inactivity Decay & Penalized Repositioning
-To prevent the pipeline from "stalling" due to unresponsive candidates, XcelCrowd implements an Inactivity Decay mechanism.
+XcelCrowd eliminates manual queue management through a "Self-Healing" pipeline. When a spot opens, the system promotes the next candidate instantly.
 
-The 24-Hour Window: Once a candidate is promoted to ACTIVE, they have a 24-hour window to acknowledge their spot.
+### 1. The "Active Pool" & Capacity
 
-The Penalty: If they fail to confirm, they are not deleted. Instead, they are moved back to the WAITLISTED status and placed at the very end of the current queue (MAX(position) + 1).
+The system maintains a strict **Active Capacity of 3**.
 
-The Cascade: The system immediately identifies the next candidate in the waitlist and promotes them to the now-vacant ACTIVE spot, creating a continuous chain of movement. 3. Atomic Concurrency & The "Last Spot" Handshake
-Designed for high-traffic scenarios, the backend prevents Race Conditions when multiple users apply simultaneously.
+- **Automatic Status:** The first 3 applicants are `ACTIVE`.
+- **Waitlist:** All others are assigned a `queue_position`.
 
-PostgreSQL Transactions: By utilizing BEGIN and COMMIT blocks, the system serializes incoming requests.
+<br />
 
-Approach: When a request hits the server, the database locks the check on the current active count. This ensures that even if two users apply at the exact same millisecond for one final spot, only one is promoted to ACTIVE while the other is accurately assigned queue_position 1 within the same transaction.
-🛠️ Tech Stack (PERN)
-Frontend: React.js — Optimized for real-time state synchronization via a polling mechanism.
+<div align="center">
+  <img src="https://github.com/Vishn-vardhan-raju/xcel-crowd-ats/blob/main/your-recruiter-ss.png?raw=true" width="850px" alt="Recruiter Dashboard" />
+  <p><i>Figure 1: Recruiter Dashboard showing real-time queue management.</i></p>
+</div>
 
-Backend: Node.js & Express — Built with a Just-In-Time (JIT) Cascade Trigger architecture.
+<br />
 
-Database: PostgreSQL — Utilizing relational integrity, Row-Level Locking, and aggregate functions for queue management.
+### 2. Inactivity Decay (The 24-Hour Rule)
 
-Icons: Lucide-React — Provides visual cues for timers and status indicators.
-📡 API Documentation & EndpointsEndpointMethodInputOutputDescription/api/applyPOST{name, email}JSONValidates email and assigns to Active or Waitlist./api/status/:emailGETEmail ParamsJSONTriggers Cascade worker and returns current position/timer./api/applicantsGETNoneArrayReturns the live dashboard data and rejection history./api/applicants/:id/acknowledgePOSTID ParamsSuccessConfirms spot and halts the 24-hour decay timer./api/applicants/:id/rejectDELETEID ParamsSuccess
-🕵️ Traceability Audit (Requirement #6)
-Every state transition in XcelCrowd is recorded to ensure the pipeline is reconstructable.
+- **The Window:** Candidates have 24 hours to confirm their spot.
+- **The Penalty:** Unresponsive users are moved to the end of the waitlist (`MAX(pos) + 1`).
+- **The Cascade:** The system instantly promotes the next person to fill the vacancy.
 
-Active Monitoring: The promoted_at timestamp tracks exactly when a user entered the active pool.
+---
 
-Historical Records: When a recruiter rejects an applicant, the system preserves their data in the rejected_applicants table before removing them from the live queue.
+## 🗄️ Database Schema
 
-Gapless Re-indexing: If a candidate is removed, the system executes a recursive SQL update to ensure the waitlist remains sequential without "ghost positions".
-Project Scope: Autonomous Next-In-Line Applicant Tracking System
+The following tables handle the live state and the permanent audit trail.
 
-Framework: PERN Stack Implementation
+<table width="100%">
+  <thead>
+    <tr style="background-color: #f2f2f2;">
+      <th>Table: applicants</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>id</b></td>
+      <td>SERIAL</td>
+      <td>Primary Key</td>
+    </tr>
+    <tr>
+      <td><b>email</b></td>
+      <td>VARCHAR</td>
+      <td>Unique identifier for status checks</td>
+    </tr>
+    <tr>
+      <td><b>status</b></td>
+      <td>VARCHAR</td>
+      <td>'ACTIVE' or 'WAITLISTED'</td>
+    </tr>
+    <tr>
+      <td><b>queue_position</b></td>
+      <td>INTEGER</td>
+      <td>Current rank in the waitlist</td>
+    </tr>
+    <tr>
+      <td><b>promoted_at</b></td>
+      <td>TIMESTAMP</td>
+      <td>Used for the 24-hour decay calculation</td>
+    </tr>
+  </tbody>
+</table>
+
+<br />
+
+---
+
+## 📡 API Endpoints
+
+<table width="100%">
+  <thead>
+    <tr style="background-color: #e8f4fd;">
+      <th>Method</th>
+      <th>Endpoint</th>
+      <th>Function</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>POST</code></td>
+      <td>/api/apply</td>
+      <td>Validates email and enters the user into the pipeline.</td>
+    </tr>
+    <tr>
+      <td><code>GET</code></td>
+      <td>/api/status/:email</td>
+      <td>Triggers Cascade worker and returns current status/timer.</td>
+    </tr>
+    <tr>
+      <td><code>POST</code></td>
+      <td>/api/applicants/:id/acknowledge</td>
+      <td>Confirms spot and halts the 24-hour decay timer.</td>
+    </tr>
+    <tr>
+      <td><code>DELETE</code></td>
+      <td>/api/applicants/:id/reject</td>
+      <td>Moves user to history and promotes the next in line.</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend:** [React.js](https://reactjs.org/)
+- **Backend:** [Node.js](https://nodejs.org/) & [Express](https://expressjs.com/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/)
+- **Icons:** [Lucide-React](https://lucide.dev/)
+
+---
+
+## 🚦 Installation & Local Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone [https://github.com/Vishn-vardhan-raju/xcel-crowd-ats.git](https://github.com/Vishn-vardhan-raju/xcel-crowd-ats.git)
+cd xcel-crowd-ats
+```
