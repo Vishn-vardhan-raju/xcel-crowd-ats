@@ -4,13 +4,6 @@
   <b>A Self-Governing Recruitment Engine Built for Atomic Fairness and Automated Queue Management.</b>
 </p>
 
-<br />
-
-<div align="center">
-  <img src="image_rough/Screenshot (646).png" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Candidate Portal Interface" />
-  <p><i>Candidate Interface: Real-time status tracking and acknowledgment portal.</i></p>
-</div>
-
 <hr />
 
 ## 📋 Core Project Requirements & Implementation
@@ -49,13 +42,6 @@
     <td><b>24-Hour Window:</b> If a promoted user fails to acknowledge, they are moved to <code>MAX(pos) + 1</code> (Penalized Position).</td>
   </tr>
 </table>
-
-<br />
-
-<div align="center">
-  <img src="image_rough/Screenshot (647).png" width="850px" style="border-radius: 10px; border: 1px solid #ddd;" alt="Recruiter Dashboard Interface" />
-  <p><i>Recruiter Dashboard: Managing the Live Queue and auditing Rejected History.</i></p>
-</div>
 
 <hr />
 
