@@ -1,127 +1,126 @@
-# 🚀 XcelCrowd: Autonomous Next-In-Line ATS
+🚀 XcelCrowd: Autonomous Next-In-Line ATS
+A Hiring Pipeline That Moves Itself.
 
-> **A Hiring Pipeline That Moves Itself.**
+XcelCrowd is an automated recruitment engine designed to eliminate the manual overhead of queue management. Built with a "Self-Healing" philosophy, the system ensures that when a spot opens up, the next best candidate is promoted instantly, maintaining a fluid, transparent, and fair hiring experience without manual intervention.
 
-XcelCrowd is an automated recruitment engine designed to eliminate the manual overhead of queue management. Built with a **"Self-Healing"** philosophy, the system ensures that when a spot opens up, the next best candidate is promoted instantly, maintaining a fluid, transparent, and fair hiring experience.
+🏗 System Architecture & Requirements Fulfillment
 
----
+1. The "Active Pool" & Waitlist (Requirements #1, #2)
+   The system maintains a strict Active Capacity of 3.
 
-## 🛠 Tech Stack (PERN)
+The first 3 applicants are automatically assigned the ACTIVE status.
 
-- **Frontend:** `React.js` (Vite) — Optimized for real-time state synchronization.
-- **Backend:** `Node.js` & `Express` — Designed with modular, atomic service layers.
-- **Database:** `PostgreSQL` — Utilizing advanced **Row-Level Locking** for industrial-grade concurrency.
-- **UI/UX:** `Lucide-React` & `Tailwind-styled CSS` — For high-fidelity visual auditing.
-- **API Client:** `Axios` — With centralized error handling.
+Any subsequent applicants are assigned to the Waitlist with a specific queue_position.
 
----
+No candidate is rejected due to capacity; they simply wait for their turn in a transparent line.
 
-## 🏗 Key Features & Architectural Highlights
+2. Inactivity Decay & Penalized Repositioning (Requirement #7)
+   To prevent the pipeline from "stalling" due to unresponsive candidates:
 
-### 1️⃣ Role-Based Multi-Portal Interface
+The 24-Hour Window: Once a candidate is promoted to ACTIVE, a 24-hour countdown begins.
 
-XcelCrowd provides distinct, decoupled entry points:
+The Decay: If the candidate fails to click "Confirm My Spot" within this window, they are penalized.
 
-- **Candidate Portal (`/candidate`):** Direct transparency into queue positions and promotion acknowledgment.
-- **Recruiter Dashboard (`/recruiter`):** A command center for auditing the pipeline and triggering the promotion cascade.
+The Penalty: They are not deleted; instead, they are moved from ACTIVE back to WAITLISTED and placed at the very end of the current queue (MAX(position) + 1).
 
-### 2️⃣ Gapless "Self-Healing" Queue (Re-indexing Algorithm)
+The Cascade: The system immediately identifies the next candidate in the waitlist and promotes them to the now-vacant ACTIVE spot.
 
-Unlike static lists, XcelCrowd corrects its own numbering. If any candidate is rejected or removed, a **recursive re-indexing function** fires immediately to ensure the waitlist remains a perfect sequence (1, 2, 3...) without "ghost positions" or fragmentation.
+3. Atomic Concurrency: The "Last Spot" Handshake (Requirement #5)
+   To handle high-traffic spikes where two users might apply at the exact same millisecond for the final active spot:
 
-### 3️⃣ Atomic Concurrency & The "Last Spot" Handshake
+PostgreSQL Transactions: We utilize BEGIN and COMMIT blocks.
 
-Designed for high-traffic spikes, the backend prevents **"Race Conditions."** When two users apply at the same millisecond for one final spot, the system uses **PostgreSQL Transactions** to referee the entry, ensuring only one becomes `ACTIVE` while the other is accurately queued.
+The Approach: When an application is processed, the server locks the check on the current active count. If two requests hit simultaneously, the database handles them sequentially. The first one takes the ACTIVE spot, and the second is mathematically assigned queue_position 1 within the same transaction, preventing "Over-filling."
 
----
+4. Traceability & State Transitions (Requirement #6)
+   Every movement in the pipeline is reconstructable:
 
-## ⚙️ Core Logic & Requirements Fulfillment (Audit-Ready)
+Active Logs: Every status change (Promotion, Decay, Rejection) is handled via atomic SQL updates.
 
-| Requirement             | Technical Implementation                                                             |
-| :---------------------- | :----------------------------------------------------------------------------------- |
-| **1. Defined Capacity** | Managed via `active_capacity` parameters in the `jobs` relational schema.            |
-| **2. Waitlist logic**   | Automated status assignment prevents premature rejections.                           |
-| **3. Auto-Promotion**   | Chain-reaction logic triggered by `ACTIVE` candidate exit or rejection.              |
-| **4. Status Check**     | Real-time `GET` requests to retrieve position and `acknowledged` status.             |
-| **5. Concurrency**      | Implemented via `BEGIN/COMMIT` and `SELECT ... FOR UPDATE` locking.                  |
-| **6. Traceability**     | Every state transition is recorded in `pipeline_logs` for historical reconstruction. |
-| **7. Inactivity Decay** | 24-hour decay window with **Penalized Repositioning** (`MAX(pos) + 1`).              |
+Rejection Tracking: Rejected users are moved to a dedicated rejected_applicants table, preserving their original ID, name, and email for a permanent audit trail.
 
----
+🛠 Tech Stack (PERN)
+Frontend: React.js — Utilizing a polling mechanism to ensure the UI reflects the most recent database state without requiring page refreshes.
 
-## 🚦 Local Setup & Installation
+Backend: Node.js & Express — Designed with a "Cascade Trigger" architecture.
 
-To run XcelCrowd on your local machine, follow these steps exactly:
+Database: PostgreSQL — Utilizing relational integrity and aggregate functions to manage queue indexing.
 
-### **1. Clone the Repository**
+Icons & UI: Lucide-React — Provides visual cues for timers and status indicators.
 
-```bash
-git clone [https://github.com/Vishn-vardhan-raju/xcel-crowd-ats.git](https://github.com/Vishn-vardhan-raju/xcel-crowd-ats.git)
-cd xcel-crowd-ats
-```
+API Client: Axios — Handles the communication between the portal and the automated backend.
 
-# ⚙️ XcelCrowd: Technical Implementation & Audit Guide
+⚙️ Implementation Details
+The "Cascade Trigger" Mechanism
+Instead of relying on a fragile third-party cron job, XcelCrowd uses a Dual-Trigger Cascade:
 
-This document provides a deep dive into how XcelCrowd fulfills the core requirements of the autonomous recruitment challenge, specifically focusing on concurrency, state transitions, and auditability.
+Background Worker: A setInterval function runs on the server every 60 seconds to clean up expired spots.
 
----
+Just-In-Time (JIT) Check: Whenever any user checks their status or a recruiter views the dashboard, the server runs the runCascade() function first. This ensures the data is accurate to the second.
 
-## 🛡️ Requirement Fulfillment Matrix
+Gapless Re-indexing
+When a candidate is removed or promoted, the system prevents "ghost positions":
 
-| Requirement             | implementation Logic                                                | Code Location                    |
-| :---------------------- | :------------------------------------------------------------------ | :------------------------------- |
-| **1. Job Capacity**     | Defined via `active_capacity` in the `jobs` table.                  | `/backend/server.js`             |
-| **2. Waitlist logic**   | Automated status assignment prevents premature rejections.          | `/backend/routes/apply.js`       |
-| **3. Auto-Promotion**   | Chain-reaction logic triggered by `ACTIVE` candidate exit.          | `/backend/services/promotion.js` |
-| **4. Status Check**     | Real-time `GET` requests for position and `acknowledged` status.    | `/frontend/src/pages/Status.jsx` |
-| **5. Concurrency**      | Implemented via `BEGIN/COMMIT` and `SELECT ... FOR UPDATE` locking. | `/backend/db/index.js`           |
-| **6. Traceability**     | Every state transition is recorded in `pipeline_logs`.              | `/backend/middleware/logger.js`  |
-| **7. Inactivity Decay** | 24-hour decay window with **Penalized Repositioning**.              | `/backend/workers/decay.js`      |
+SQL
+UPDATE applicants SET queue_position = queue_position - 1 WHERE queue_position > 0;
+This ensures that if Queue #1 is promoted, Queue #2 automatically becomes the new Queue #1.
 
----
+🚦 Local Setup & Installation
 
-## 🧠 Deep Dive: Advanced System Logic
+1. Clone the Repository
+   Bash
+   git clone https://github.com/Vishn-vardhan-raju/xcel-crowd-ats.git
+   cd xcel-crowd-ats
+2. Database Setup
+   Create a PostgreSQL database and run the following schema:
 
-### 1. Atomic Concurrency (Requirement #5)
+SQL
+CREATE TABLE applicants (
+id SERIAL PRIMARY KEY,
+name VARCHAR(255) NOT NULL,
+email VARCHAR(255) UNIQUE NOT NULL,
+status VARCHAR(50) DEFAULT 'WAITLISTED',
+queue_position INTEGER,
+promoted_at TIMESTAMP,
+acknowledged BOOLEAN DEFAULT false
+);
 
-To handle the "Last Available Spot" race condition:
+CREATE TABLE rejected_applicants (
+id INTEGER PRIMARY KEY,
+name VARCHAR(255),
+email VARCHAR(255),
+rejected_at TIMESTAMP DEFAULT NOW()
+); 3. Environment Configuration
+Create a .env file in the backend folder:
 
-- The system initiates a **PostgreSQL Transaction**.
-- It locks the specific Job row using `FOR UPDATE`.
-- No other process can read the capacity until the current transaction completes.
-- **Result:** Total elimination of "Over-filling" errors.
+Code snippet
+DATABASE_URL=postgres://your_user:your_password@localhost:5432/your_db_name
+PORT=5000 4. Run the Application
+Bash
 
-### 2. Gapless Re-indexing (The Self-Healing Queue)
+# In backend folder
 
-When a candidate is removed from the waitlist (Positions 1, 2, 3, 4, 5), the system does not leave a hole.
+npm install
+node server.js
 
-- A recursive SQL update triggers: `UPDATE applicants SET queue_position = queue_position - 1 WHERE queue_position > $1`.
-- This ensures the line is always sequential, maintaining user trust and system clarity.
+# In frontend folder
 
-### 3. Inactivity Decay & Penalty (Requirement #7)
+npm install
+npm run dev
+📡 API Documentation
+Applicants API
+POST /api/apply: Validates email (must start with a letter, end in .com) and places user in the pipeline.
 
-If an `ACTIVE` applicant fails to acknowledge their promotion within the 24-hour window:
+GET /api/status/:email: Triggers the cascade and returns the user's current status and countdown timer.
 
-- **Status Shift:** Reverts from `ACTIVE` to `WAITLISTED`.
-- **Penalty:** Their `queue_position` is set to `(SELECT MAX(queue_position) FROM applicants) + 1`.
-- **Cascade:** The next person in line is automatically promoted to fill the newly opened spot.
+POST /api/applicants/:id/acknowledge: Confirms a candidate's spot and stops the 24-hour decay timer.
 
----
+Recruiter API
+GET /api/applicants: Returns a combined object containing the live queue and the rejected history.
 
-## 🕵️ Traceability Audit (Requirement #6)
+DELETE /api/applicants/:id/reject: Removes an applicant from the live queue, moves them to history, and triggers an immediate promotion cascade.
 
-The `pipeline_logs` table stores the following "Paper Trail":
+🕵️ Audit Trail
+XcelCrowd is built for transparency. Every transition from WAITLISTED to ACTIVE is timestamped in the promoted_at column, and every manual rejection is logged in the rejected_applicants table, ensuring that the hiring process is fully traceable and reconstructable for compliance audits.
 
-- `applicant_id`: Who moved?
-- `action_type`: Applied, Promoted, Acknowledged, Rejected, or Decayed.
-- `details`: The previous and new status/position.
-- `created_at`: Exact microsecond of the transition.
-
----
-
-## 🧠 AI Collaboration Dimension (XVal Evaluation)
-
-The development of these complex features involved iterative AI refinement:
-
-- **Refinement:** AI audited the concurrency logic to ensure no deadlocks occurred during high-traffic simulations.
-- **Customization:** The **Penalized Repositioning** strategy was customized to ensure that users are never "deleted," merely shifted back, balancing fairness with system efficiency.
+Framework: PERN Stack (PostgreSQL, Express, React, Node)

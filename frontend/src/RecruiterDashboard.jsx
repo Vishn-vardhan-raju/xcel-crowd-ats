@@ -1,44 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users, Trash2 } from 'lucide-react';
 
 export default function RecruiterDashboard() {
-    const [list, setList] = useState([]);
+    const [data, setData] = useState({ active: [], rejected: [] });
+
     const fetchData = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/recruiter/applicants/6');
-            setList(res.data);
-        } catch (err) { console.error(err); }
+            const res = await axios.get('http://localhost:5000/api/applicants');
+            setData(res.data);
+        } catch (err) { console.error("Fetch error", err); }
     };
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 3000);
-        return () => clearInterval(interval);
+        const inter = setInterval(fetchData, 5000);
+        return () => clearInterval(inter);
     }, []);
 
-    const reject = async (id) => {
-        await axios.patch(`http://localhost:5000/api/applicants/${id}/status`, { status: 'REJECTED' });
-        fetchData();
+    const rejectUser = async (id) => {
+        if(window.confirm("Move this user to Rejected History and promote next?")) {
+            await axios.delete(`http://localhost:5000/api/applicants/${id}/reject`);
+            fetchData();
+        }
     };
 
     return (
-        <div style={{ padding: '40px', fontFamily: 'sans-serif' }}>
-            <h2><Users/> Recruiter Dashboard</h2>
-            <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ padding: '30px', fontFamily: 'Arial, sans-serif' }}>
+            <h2 style={{color: '#2d3436'}}>Recruiter Dashboard (Live Queue)</h2>
+            <table border="1" width="100%" style={{borderCollapse: 'collapse', marginBottom: '50px'}}>
                 <thead style={{background: '#f4f4f4'}}>
-                    <tr><th>Name</th><th>Status</th><th>Queue Pos</th><th>Ack?</th><th>Action</th></tr>
+                    <tr><th>ID</th><th>Name</th><th>Email</th><th>Status</th><th>Queue Pos</th><th>Ack?</th><th>Action</th></tr>
                 </thead>
                 <tbody>
-                    {list.map(u => (
-                        <tr key={u.id}>
-                            <td>{u.name}<br/><small>{u.email}</small></td>
-                            <td style={{color: u.status === 'ACTIVE' ? 'green' : 'orange', fontWeight: 'bold'}}>{u.status}</td>
-                            <td>{u.queue_position || '--'}</td>
-                            <td>{u.acknowledged ? '✅' : '⏳'}</td>
-                            <td><button onClick={() => reject(u.id)} style={{color: 'red', cursor: 'pointer'}}><Trash2 size={14}/> Reject</button></td>
+                    {data.active.map(app => (
+                        <tr key={app.id}>
+                            <td style={{textAlign: 'center'}}>{app.id}</td>
+                            <td>{app.name}</td><td>{app.email}</td>
+                            <td style={{color: app.status === 'ACTIVE' ? 'green' : 'orange', fontWeight: 'bold'}}>{app.status}</td>
+                            <td style={{textAlign: 'center'}}>{app.queue_position || '-'}</td>
+                            <td style={{textAlign: 'center'}}>{app.acknowledged ? '✅' : '❌'}</td>
+                            <td style={{textAlign: 'center'}}>
+                                <button onClick={() => rejectUser(app.id)} style={{color: 'red', cursor: 'pointer'}}>Reject</button>
+                            </td>
                         </tr>
                     ))}
+                </tbody>
+            </table>
+
+            <h2 style={{color: '#d63031'}}>Rejected Users History</h2>
+            <table border="1" width="100%" style={{borderCollapse: 'collapse'}}>
+                <thead style={{background: '#ffeaa7'}}>
+                    <tr><th>Original ID</th><th>Name</th><th>Email</th><th>Rejected Date</th></tr>
+                </thead>
+                <tbody>
+                    {data.rejected.length > 0 ? data.rejected.map(rej => (
+                        <tr key={rej.id}>
+                            <td style={{textAlign: 'center'}}>{rej.id}</td>
+                            <td>{rej.name}</td><td>{rej.email}</td>
+                            <td>{new Date(rej.rejected_at).toLocaleString()}</td>
+                        </tr>
+                    )) : <tr><td colSpan="4" style={{textAlign:'center', padding: '10px'}}>No rejected users yet.</td></tr>}
                 </tbody>
             </table>
         </div>
